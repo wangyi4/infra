@@ -1,0 +1,131 @@
+<mxfile host="app.diagrams.net" modified="2026-06-26T00:00:00.000Z" agent="GitHub Copilot" version="24.7.17" type="device">
+  <diagram id="base-template-build-flow" name="Base Template Build Flow">
+    <mxGraphModel dx="2200" dy="1400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="&lt;b&gt;Base Template Build 完整流程&lt;/b&gt;&lt;br&gt;命令：make -C packages/shared/scripts local-build-base-template&lt;br&gt;目标：从 OCI/Docker base image 生成可启动、可缓存、可调度的 E2B base template" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#17202A;fontColor=#FFFFFF;strokeColor=#17202A;fontSize=18;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="2260" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lane-client" value="客户端 / Template API" style="swimlane;html=1;horizontal=0;startSize=34;fillColor=#EAF2F8;strokeColor=#5DADE2;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="140" width="420" height="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-orch" value="Orchestrator 构建调度" style="swimlane;html=1;horizontal=0;startSize=34;fillColor=#EAFAF1;strokeColor=#58D68D;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="500" y="140" width="430" height="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-base" value="Base 阶段：OCI -&gt; rootfs -&gt; provision" style="swimlane;html=1;horizontal=0;startSize=34;fillColor=#FEF9E7;strokeColor=#F4D03F;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="970" y="140" width="520" height="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-layer" value="Layer 执行 / sandbox / snapshot" style="swimlane;html=1;horizontal=0;startSize=34;fillColor=#FDEDEC;strokeColor=#EC7063;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="140" width="390" height="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-post" value="User / Finalize / Optimize / Result" style="swimlane;html=1;horizontal=0;startSize=34;fillColor=#F4ECF7;strokeColor=#AF7AC5;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1960" y="140" width="340" height="1340" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n1" value="&lt;b&gt;1. 发起本地构建&lt;/b&gt;&lt;br&gt;完成：安装脚本依赖并调用 build.prod.ts。&lt;br&gt;结果：向本地 template-manager/orchestrator 提交 base template build 请求。&lt;br&gt;代码：packages/shared/scripts/build.prod.ts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D6EAF8;strokeColor=#2E86C1;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="90" y="190" width="320" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="&lt;b&gt;2. TemplateCreate 接收请求&lt;/b&gt;&lt;br&gt;完成：创建 template/build metadata，启动后台 goroutine。&lt;br&gt;结果：客户端开始等待构建日志和最终状态。&lt;br&gt;代码：pkg/template/server/create_template.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D6EAF8;strokeColor=#2E86C1;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="90" y="350" width="320" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="&lt;b&gt;3. 调用 Builder.Build&lt;/b&gt;&lt;br&gt;完成：准备 BuildContext、envd version、cache scope、upload errgroup。&lt;br&gt;结果：进入 runBuild 主构建流程。&lt;br&gt;代码：pkg/template/build/builder.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5F5E3;strokeColor=#239B56;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="550" y="190" width="330" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="&lt;b&gt;4. runBuild 初始化执行器&lt;/b&gt;&lt;br&gt;完成：选择 templateStorage/NFS cache，创建 hash index、LayerExecutor、Base/User/Step/Finalize/Optimize builders。&lt;br&gt;结果：得到按顺序执行的 phase 列表。&lt;br&gt;代码：pkg/template/build/builder.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5F5E3;strokeColor=#239B56;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="550" y="360" width="330" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="&lt;b&gt;5. phases.Run 调度 phase&lt;/b&gt;&lt;br&gt;完成：对每个 BuilderPhase 计算 Hash、查 Layer/cache、记录日志和 metrics。&lt;br&gt;结果：未命中缓存的 phase 调用 Build；命中缓存则跳过构建。&lt;br&gt;代码：pkg/template/build/phases/phase.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5F5E3;strokeColor=#239B56;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="550" y="550" width="330" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n6" value="&lt;b&gt;6. BaseBuilder 解析 base 来源&lt;/b&gt;&lt;br&gt;完成：确定 FROM image 或 FROM TEMPLATE，计算 base layer hash/cache metadata。&lt;br&gt;结果：需要构建时进入 buildLayerFromOCI。&lt;br&gt;代码：pkg/template/build/phases/base/builder.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCF3CF;strokeColor=#B7950B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="190" width="400" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="n7" value="&lt;b&gt;7. 创建临时构建目录和 rootfs 路径&lt;/b&gt;&lt;br&gt;完成：在 TemplatesDir/buildID 下创建 rootfs.filesystem.build。&lt;br&gt;结果：后续 OCI 解包和 provision 都写入该 rootfs。&lt;br&gt;代码：BaseBuilder.buildLayerFromOCI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCF3CF;strokeColor=#B7950B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="350" width="400" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="n8" value="&lt;b&gt;8. constructLayerFilesFromOCI&lt;/b&gt;&lt;br&gt;完成：创建 rootfs builder，渲染 provision.sh，调用 CreateExt4Filesystem。&lt;br&gt;结果：返回 rootfs block device、空 memfile、OCI image config。&lt;br&gt;代码：pkg/template/build/phases/base/files.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCF3CF;strokeColor=#B7950B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="505" width="400" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="n9" value="&lt;b&gt;9. OCI/Docker image -&gt; ext4 rootfs&lt;/b&gt;&lt;br&gt;完成：拉取 base image、设置系统文件、写 resolv.conf/provision script、解压 OCI layers 到 ext4。&lt;br&gt;结果：得到初始 root filesystem。&lt;br&gt;代码：pkg/template/build/core/rootfs、core/oci、core/filesystem" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCF3CF;strokeColor=#B7950B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="675" width="400" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n10" value="&lt;b&gt;10. 创建 LocalTemplate 并继承 OCI env&lt;/b&gt;&lt;br&gt;完成：用 rootfs + memfile 创建 LocalTemplate；读取 image config envs。&lt;br&gt;结果：baseMetadata.Context.EnvVars 填入 Docker image 环境变量。&lt;br&gt;代码：base/builder.go、sandbox/template" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCF3CF;strokeColor=#B7950B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="855" width="400" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="n11" value="&lt;b&gt;11. Provision sandbox template&lt;/b&gt;&lt;br&gt;完成：用 BusyBox init 启动临时 VM，执行 provision.sh；安装 systemd、openssh、sudo、chrony、socat、fuse3、iptables、nfs-common、jq 等。&lt;br&gt;结果：rootfs 变成可启动 sandbox 基础系统。&lt;br&gt;代码：pkg/template/build/phases/base/provision.go + provision.sh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCF3CF;strokeColor=#B7950B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="1020" width="400" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="n12" value="&lt;b&gt;12. Provision 成功后清理与检查&lt;/b&gt;&lt;br&gt;完成：等待 /provision.result，Shutdown VM，删除 result 文件，检查 ext4 完整性，按 DiskSizeMB 扩容 rootfs。&lt;br&gt;结果：得到 provision 后的最终 base rootfs 文件。&lt;br&gt;代码：provisionSandbox、CheckIntegrity、enlargeDiskAfterProvisioning" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCF3CF;strokeColor=#B7950B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="1220" width="400" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n13" value="&lt;b&gt;13. 创建 base sandbox layer&lt;/b&gt;&lt;br&gt;完成：NewCreateSandbox，传入 rootfs cache path 和 reserved blocks 选项。&lt;br&gt;结果：为 base layer snapshot 启动 sandbox。&lt;br&gt;代码：base/builder.go、layer/create_sandbox.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="190" width="300" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="n14" value="&lt;b&gt;14. LayerExecutor.BuildLayer&lt;/b&gt;&lt;br&gt;完成：获取 source template，Create/Resume sandbox，必要时更新 envd。&lt;br&gt;结果：sandbox 进入可执行 action 状态。&lt;br&gt;代码：pkg/template/build/layer/layer_executor.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="365" width="300" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="n15" value="&lt;b&gt;15. 执行 base action: sync&lt;/b&gt;&lt;br&gt;完成：通过 sandbox proxy 调用 envd Process.Start 执行 BusyBox sync；失败时对 unavailable 做短暂 retry。&lt;br&gt;结果：rootfs 写入落盘，可安全 snapshot。&lt;br&gt;代码：sandboxtools.SyncChangesToDisk、RunCommand" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="545" width="300" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n16" value="&lt;b&gt;16. PauseAndUpload&lt;/b&gt;&lt;br&gt;完成：暂停 sandbox，生成 snapshot/rootfs/memfile metadata，上传 build cache/template layer。&lt;br&gt;结果：base layer 可被后续 USER/steps/finalize 作为 sourceLayer 使用。&lt;br&gt;代码：LayerExecutor.PauseAndUpload、storage/cache" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="745" width="300" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n17" value="&lt;b&gt;17. 默认 USER 阶段&lt;/b&gt;&lt;br&gt;完成：如果模板版本要求默认用户，构造 synthetic USER step，创建 user 并更新 context.User。&lt;br&gt;结果：日志中显示 [base] DEFAULT USER user。&lt;br&gt;代码：pkg/template/build/phases/user/builder.go + steps/StepBuilder" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8DAEF;strokeColor=#884EA0;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1995" y="190" width="270" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="n18" value="&lt;b&gt;18. 用户定义 steps&lt;/b&gt;&lt;br&gt;完成：逐个执行 Dockerfile/template steps；每个 step 计算 hash、查 cache、Create/Resume sandbox、执行命令、sync、snapshot。&lt;br&gt;结果：生成一串增量 template layers。&lt;br&gt;代码：phases/steps/builder.go、commands.CommandExecutor" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8DAEF;strokeColor=#884EA0;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1995" y="385" width="270" height="175" as="geometry" />
+        </mxCell>
+        <mxCell id="n19" value="&lt;b&gt;19. Finalize 阶段&lt;/b&gt;&lt;br&gt;完成：用最终 default user/workdir 配置 envd；运行配置脚本、start/ready 相关后处理、打包 CA cert bundle、sync。&lt;br&gt;结果：生成最终可启动 template layer。&lt;br&gt;代码：phases/finalize/builder.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8DAEF;strokeColor=#884EA0;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1995" y="590" width="270" height="175" as="geometry" />
+        </mxCell>
+        <mxCell id="n20" value="&lt;b&gt;20. Optimize 阶段&lt;/b&gt;&lt;br&gt;完成：从 finalize snapshot 多次 resume sandbox，收集 UFFD dirty/prefetch 数据，计算公共 memory prefetch mapping。&lt;br&gt;结果：metadata 增加 prefetch 信息；失败只降级为无 prefetch。&lt;br&gt;代码：phases/optimize/builder.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8DAEF;strokeColor=#884EA0;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1995" y="795" width="270" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="n21" value="&lt;b&gt;21. 收尾 Result&lt;/b&gt;&lt;br&gt;完成：等待 layer uploads，读取 rootfs size，计算 scheduling metadata。&lt;br&gt;结果：返回 EnvdVersion、KernelVersion、FirecrackerVersion、RootfsSizeMB、SchedulingMetadata。&lt;br&gt;代码：runBuild、getRootfsSize、templateSchedulingMetadata" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8DAEF;strokeColor=#884EA0;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1995" y="1005" width="270" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="n22" value="&lt;b&gt;22. TemplateCreate 标记成功&lt;/b&gt;&lt;br&gt;完成：SetSuccess 写入 TemplateBuildMetadata，并上报 Environment built event。&lt;br&gt;结果：客户端收到 Build finished。&lt;br&gt;代码：pkg/template/server/create_template.go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D6EAF8;strokeColor=#2E86C1;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="90" y="535" width="320" height="145" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fix" value="&lt;b&gt;本次 debug 关联的关键链路修复&lt;/b&gt;&lt;br&gt;1. provisioning: apt proxy + corporate DNS + ALLOW_SANDBOX_INTERNAL_CIDRS=10.0.0.0/8。&lt;br&gt;2. envd proxy: envd 端口转发使用真实 upstream Host，并注入 X-Access-Token。&lt;br&gt;3. internal upstream: shared proxy transport 禁用 host http_proxy/https_proxy，避免 10.11.x.x:49983 被送到公司代理。&lt;br&gt;对应文件：.env.local、base/provision.sh、orchestrator/pkg/proxy/proxy.go、shared/pkg/proxy/pool/client.go、destination.go、sandboxtools/command.go" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#FFF2CC;strokeColor=#D6B656;align=left;spacing=12;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="520" y="1260" width="390" height="190" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n1" target="n2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n2" target="n3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n3" target="n4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n4" target="n5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n5" target="n6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n6" target="n7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n7" target="n8"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n8" target="n9"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n9" target="n10"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n10" target="n11"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n11" target="n12"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n12" target="n13"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n13" target="n14"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n14" target="n15"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n15" target="n16"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n16" target="n17"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n17" target="n18"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n18" target="n19"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n19" target="n20"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n20" target="n21"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#566573;endArrow=block;endFill=1;" edge="1" parent="1" source="n21" target="n22"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="cache" value="缓存判断贯穿每个 phase：Hash -&gt; LayerMetaFromHash/Cached -&gt; 命中则跳过 Build，未命中才创建 sandbox 和上传新 layer。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EBF5FB;strokeColor=#85C1E9;dashed=1;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="540" y="760" width="360" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-cache" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2E86C1;dashed=1;endArrow=none;" edge="1" parent="1" source="cache" target="n5"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

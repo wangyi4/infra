@@ -28,4 +28,6 @@ type Destination struct {
 	IncludeSandboxIdInProxyErrorLogger bool
 	// MaskRequestHost is used to mask the request host.
 	MaskRequestHost *string
+	// EnvdAccessToken is forwarded only for envd port requests.
+	EnvdAccessToken *string
 }

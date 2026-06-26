@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/proxy"
@@ -29,6 +30,11 @@ import (
 )
 
 const commandHardTimeout = 1 * time.Hour
+
+const (
+	syncRetryTimeout = 20 * time.Second
+	syncRetryDelay   = 250 * time.Millisecond
+)
 
 func RunCommandWithOutput(
 	ctx context.Context,
@@ -242,13 +248,32 @@ func SyncChangesToDisk(
 	proxy *proxy.SandboxProxy,
 	sandboxID string,
 ) error {
-	return RunCommand(
-		ctx,
-		proxy,
-		sandboxID,
-		rootfs.SandboxBusyBoxPath+" sync",
-		metadata.Context{
-			User: "root",
-		},
-	)
+	ctx, cancel := context.WithTimeout(ctx, syncRetryTimeout)
+	defer cancel()
+
+	command := rootfs.SandboxBusyBoxPath + " sync"
+	context := metadata.Context{User: "root"}
+	var lastErr error
+
+	for attempt := 1; ; attempt++ {
+		lastErr = RunCommand(ctx, proxy, sandboxID, command, context)
+		if lastErr == nil {
+			return nil
+		}
+
+		if connect.CodeOf(lastErr) != connect.CodeUnavailable {
+			return lastErr
+		}
+
+		logger.L().Warn(ctx, "retrying sync command after unavailable process API",
+			logger.WithSandboxID(sandboxID),
+			zap.Error(lastErr),
+		)
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("sync command did not become available after %d attempts: %w", attempt, lastErr)
+		case <-time.After(syncRetryDelay):
+		}
+	}
 }

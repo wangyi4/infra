@@ -32,6 +32,45 @@ done
 
 if [ -n "$MISSING" ]; then
     echo "Missing packages detected, installing:$MISSING"
+
+    # Reuse host proxy settings for apt when provided.
+    HTTP_PROXY_VALUE="${HTTP_PROXY:-${http_proxy:-}}"
+    HTTPS_PROXY_VALUE="${HTTPS_PROXY:-${https_proxy:-}}"
+    NO_PROXY_VALUE="${NO_PROXY:-${no_proxy:-}}"
+
+    if [ -z "$HTTP_PROXY_VALUE" ] && [ -z "$HTTPS_PROXY_VALUE" ]; then
+        HTTP_PROXY_VALUE="http://proxy-dmz.intel.com:912"
+        HTTPS_PROXY_VALUE="http://proxy-dmz.intel.com:912"
+        echo "No proxy variables found in environment, using fallback apt proxy"
+    fi
+
+    if [ -n "$HTTP_PROXY_VALUE" ] || [ -n "$HTTPS_PROXY_VALUE" ]; then
+        mkdir -p /etc/apt/apt.conf.d
+        {
+            if [ -n "$HTTP_PROXY_VALUE" ]; then
+                echo "Acquire::http::Proxy \"$HTTP_PROXY_VALUE\";"
+            fi
+            if [ -n "$HTTPS_PROXY_VALUE" ]; then
+                echo "Acquire::https::Proxy \"$HTTPS_PROXY_VALUE\";"
+            fi
+        } >/etc/apt/apt.conf.d/99proxy
+
+        [ -n "$HTTP_PROXY_VALUE" ] && export HTTP_PROXY="$HTTP_PROXY_VALUE" http_proxy="$HTTP_PROXY_VALUE"
+        [ -n "$HTTPS_PROXY_VALUE" ] && export HTTPS_PROXY="$HTTPS_PROXY_VALUE" https_proxy="$HTTPS_PROXY_VALUE"
+        [ -n "$NO_PROXY_VALUE" ] && export NO_PROXY="$NO_PROXY_VALUE" no_proxy="$NO_PROXY_VALUE"
+
+        echo "Configured apt proxy from environment variables"
+    else
+        echo "No proxy variables found in environment, apt will connect directly"
+    fi
+
+    resolv=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}' | head -n 1)
+    echo "Using nameserver $resolv for apt-get"
+    $BUSYBOX chattr -i /etc/resolv.conf
+    sed -i 's/8\.8\.8\.8/10.109.19.199/g' /etc/resolv.conf
+    resolv=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}' | head -n 1)
+    echo "Using changed nameserver $resolv for apt-get"
+    $BUSYBOX chattr +i /etc/resolv.conf
     apt-get -q update
     DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get -qq -o=Dpkg::Use-Pty=0 install -y --no-install-recommends $MISSING
 else

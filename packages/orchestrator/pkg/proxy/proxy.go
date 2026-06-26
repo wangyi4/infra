@@ -121,6 +121,7 @@ func NewSandboxProxy(meterProvider metric.MeterProvider, port uint16, sandboxes 
 				ConnectionKey:   sbx.LifecycleID,
 				RequestLogger:   logger,
 				MaskRequestHost: maskRequestHost,
+				EnvdAccessToken: sbx.Config.Envd.AccessToken,
 			}, nil
 		},
 		connLimitConfig,

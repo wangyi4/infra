@@ -40,7 +40,7 @@ func newProxyClient(
 	activeConnections := smap.New[*tracking.Connection]()
 
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
+		Proxy: nil,
 		// Limit the max connection per host to avoid exhausting the number of available ports to one host.
 		MaxIdleConnsPerHost:   maxHostIdleConns,
 		MaxIdleConns:          maxIdleConns,
@@ -113,6 +113,11 @@ func newProxyClient(
 				// Mask the request host to bypass source host protections.
 				r.Out.Header.Set("X-Forwarded-Host", r.In.Host)
 				r.Out.Host = *t.MaskRequestHost
+			} else if t.SandboxPort == uint64(consts.DefaultEnvdServerPort) {
+				r.Out.Host = t.Url.Host
+				if t.EnvdAccessToken != nil {
+					r.Out.Header.Set("X-Access-Token", *t.EnvdAccessToken)
+				}
 			} else {
 				// We are **not** using SetXForwarded() because servers can sometimes modify the content-location header to be http which might break some customer services.
 				r.Out.Host = r.In.Host
