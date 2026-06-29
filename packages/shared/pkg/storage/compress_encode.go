@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	iaa "github.com/intel-sandbox/go-iaa"
 	"github.com/klauspost/compress/zstd"
 	lz4 "github.com/pierrec/lz4/v4"
 )
@@ -14,6 +15,21 @@ import (
 // reused across frames within a single CompressStream call.
 type compressor interface {
 	compress(src []byte) ([]byte, error)
+}
+
+type deflateCompressor struct {
+	h *iaa.IAA_Handle
+}
+
+func (c *deflateCompressor) compress(src []byte) ([]byte, error) {
+	dst := make([]byte, len(src)*2) // Allocate a buffer twice the size of the input for worst-case scenario
+	out, err := c.h.Compress(src, dst)
+	if err != nil {
+		return nil, fmt.Errorf("deflate compress: %w", err)
+	}
+	fmt.Printf("input: %d, output: %d\n", len(src), len(out))
+
+	return out, nil
 }
 
 // lz4Compressor wraps a pooled lz4.Writer. The writer is reused via Reset
@@ -101,6 +117,21 @@ func newCompressorPool(cfg CompressConfig) (*sync.Pool, error) {
 			_ = w.Apply(lz4Opts...) //nolint:errcheck // options validated above
 
 			return &lz4Compressor{w: w}
+		}
+	case CompressionDeflate:
+		first, err := iaa.InitIAAHandle()
+		if err != nil {
+			return nil, fmt.Errorf("deflate encoder: %w", err)
+		}
+		pool.Put(&deflateCompressor{h: first})
+
+		pool.New = func() any {
+			h, err := iaa.InitIAAHandle() //nolint:errcheck // options validated above
+			if err != nil {
+				fmt.Errorf("deflate encoder: %w", err)
+				return nil
+			}
+			return &deflateCompressor{h: h}
 		}
 	default:
 		return nil, fmt.Errorf("unsupported compression type: %s", cfg.CompressionType())

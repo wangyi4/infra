@@ -4,6 +4,9 @@ go 1.26.3
 
 tool github.com/go-swagger/go-swagger/cmd/swagger
 
+require github.com/intel-sandbox/go-iaa v0.0.0
+replace github.com/intel-sandbox/go-iaa => /root/e2b-dev/go-iaa
+
 require (
 	cloud.google.com/go/artifactregistry v1.20.0
 	cloud.google.com/go/storage v1.59.2

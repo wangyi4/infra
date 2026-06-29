@@ -14,6 +14,7 @@ const (
 	CompressionNone = CompressionType(iota)
 	CompressionZstd
 	CompressionLZ4
+	CompressionDeflate
 	// numCompressionTypes counts the codecs above; keep last so it auto-updates.
 	numCompressionTypes
 )
