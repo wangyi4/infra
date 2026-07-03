@@ -373,6 +373,8 @@ func (ct CompressionType) Suffix() string {
 		return ".zstd"
 	case CompressionLZ4:
 		return ".lz4"
+	case CompressionDeflate:
+		return ".deflate"
 	default:
 		return ""
 	}
@@ -384,6 +386,8 @@ func (ct CompressionType) String() string {
 		return "zstd"
 	case CompressionLZ4:
 		return "lz4"
+	case CompressionDeflate:
+		return "deflate"
 	default:
 		return "none"
 	}
@@ -397,6 +401,8 @@ func parseCompressionType(s string) CompressionType {
 		return CompressionLZ4
 	case "zstd":
 		return CompressionZstd
+	case "deflate":
+		return CompressionDeflate
 	default:
 		return CompressionNone
 	}

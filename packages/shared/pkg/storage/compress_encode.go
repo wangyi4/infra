@@ -22,12 +22,11 @@ type deflateCompressor struct {
 }
 
 func (c *deflateCompressor) compress(src []byte) ([]byte, error) {
-	dst := make([]byte, len(src)*2) // Allocate a buffer twice the size of the input for worst-case scenario
+	dst := make([]byte, len(src)) // Allocate a buffer twice the size of the input for worst-case scenario
 	out, err := c.h.Compress(src, dst)
 	if err != nil {
 		return nil, fmt.Errorf("deflate compress: %w", err)
 	}
-	fmt.Printf("input: %d, output: %d\n", len(src), len(out))
 
 	return out, nil
 }
