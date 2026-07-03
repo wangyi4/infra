@@ -88,7 +88,7 @@ func newPart(index int, parentCtx context.Context, workers int) (*part, context.
 	return p, ctx
 }
 
-func (p *part) addFrame(ctx context.Context, buf inputBuf, n int, pool *sync.Pool) {
+func (p *part) addFrame(ctx context.Context, buf inputBuf, n int, pool *compressorPool) {
 	frameInPart := &frame{uncompressedSize: n}
 	p.frames = append(p.frames, frameInPart)
 	uncompressedData := buf.Bytes()[:n]
@@ -98,7 +98,7 @@ func (p *part) addFrame(ctx context.Context, buf inputBuf, n int, pool *sync.Poo
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		c := pool.Get().(compressor)
+		c := pool.Get()
 		out, err := c.compress(uncompressedData)
 		pool.Put(c)
 		if err != nil {
@@ -128,13 +128,21 @@ func compressStream(ctx context.Context, in io.Reader, cfg CompressConfig, uploa
 	work, workCtx := errgroup.WithContext(ctx)
 	work.SetLimit(maxUploadConcurrency + 1)
 
+	compressors, err := newCompressorPool(cfg)
+	if err != nil {
+		return nil, [32]byte{}, fmt.Errorf("create compressor pool: %w", err)
+	}
+	//defer func() {
+	//	_ = compressors.Close()
+	//}()
+
 	// Start the read loop.
 	q := make(chan *part, 2)
 	hasher := sha256.New()
 	work.Go(func() error {
 		defer close(q)
 
-		return readLoop(workCtx, in, cfg, hasher, q)
+		return readLoop(workCtx, in, cfg, hasher, q, compressors)
 	})
 
 	// Upload loop.
@@ -184,12 +192,7 @@ func compressStream(ctx context.Context, in io.Reader, cfg CompressConfig, uploa
 	return ft, sum256(hasher), nil
 }
 
-func readLoop(ctx context.Context, in io.Reader, cfg CompressConfig, hasher io.Writer, q chan<- *part) error {
-	compressors, err := newCompressorPool(cfg)
-	if err != nil {
-		return err
-	}
-
+func readLoop(ctx context.Context, in io.Reader, cfg CompressConfig, hasher io.Writer, q chan<- *part, compressors *compressorPool) error {
 	frameSize := cfg.FrameSize()
 	minPartSize := cfg.MinPartSize()
 	workers := max(cfg.FrameEncodeWorkers, 1)

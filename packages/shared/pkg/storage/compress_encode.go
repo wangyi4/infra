@@ -15,6 +15,43 @@ import (
 // reused across frames within a single CompressStream call.
 type compressor interface {
 	compress(src []byte) ([]byte, error)
+	close() error
+}
+
+type compressorPool struct {
+	pool sync.Pool
+	mu   sync.Mutex
+	all  []compressor
+}
+
+func (p *compressorPool) addCreated(c compressor) {
+	p.mu.Lock()
+	p.all = append(p.all, c)
+	p.mu.Unlock()
+}
+
+func (p *compressorPool) Get() compressor {
+	return p.pool.Get().(compressor)
+}
+
+func (p *compressorPool) Put(c compressor) {
+	p.pool.Put(c)
+}
+
+func (p *compressorPool) Close() error {
+	p.mu.Lock()
+	all := p.all
+	p.all = nil
+	p.mu.Unlock()
+
+	var closeErr error
+	for _, c := range all {
+		if err := c.close(); err != nil && closeErr == nil {
+			closeErr = err
+		}
+	}
+
+	return closeErr
 }
 
 type deflateCompressor struct {
@@ -29,6 +66,14 @@ func (c *deflateCompressor) compress(src []byte) ([]byte, error) {
 	}
 
 	return out, nil
+}
+
+func (c *deflateCompressor) close() error {
+	if c.h == nil {
+		return nil
+	}
+
+	return c.h.Close()
 }
 
 // lz4Compressor wraps a pooled lz4.Writer. The writer is reused via Reset
@@ -53,6 +98,8 @@ func (c *lz4Compressor) compress(src []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func (c *lz4Compressor) close() error { return nil }
+
 // zstdCompressor wraps a pooled zstd.Encoder using EncodeAll.
 type zstdCompressor struct {
 	enc *zstd.Encoder
@@ -62,12 +109,20 @@ func (z *zstdCompressor) compress(src []byte) ([]byte, error) { //nolint:unparam
 	return z.enc.EncodeAll(src, make([]byte, 0, len(src))), nil
 }
 
+func (z *zstdCompressor) close() error {
+	if z.enc == nil {
+		return nil
+	}
+	z.enc.Close()
+	return nil
+}
+
 // newCompressorPool returns a pool of compressors for the given config.
 // Both LZ4 and zstd encoders are pooled and reused via Reset/EncodeAll.
 // The config is validated eagerly — if zstd options are invalid, an error
 // is returned immediately rather than deferred to pool.Get().
-func newCompressorPool(cfg CompressConfig) (*sync.Pool, error) {
-	pool := &sync.Pool{}
+func newCompressorPool(cfg CompressConfig) (*compressorPool, error) {
+	pool := &compressorPool{}
 
 	switch cfg.CompressionType() {
 	case CompressionZstd:
@@ -87,13 +142,16 @@ func newCompressorPool(cfg CompressConfig) (*sync.Pool, error) {
 		if err != nil {
 			return nil, fmt.Errorf("zstd encoder: %w", err)
 		}
-		pool.Put(&zstdCompressor{enc: first})
+		firstComp := &zstdCompressor{enc: first}
+		pool.addCreated(firstComp)
+		pool.Put(firstComp)
 
-		pool.New = func() any {
+		pool.pool.New = func() any {
 			// Options are already validated; NewWriter won't fail.
 			enc, _ := zstd.NewWriter(nil, zstdOpts...)
-
-			return &zstdCompressor{enc: enc}
+			comp := &zstdCompressor{enc: enc}
+			pool.addCreated(comp)
+			return comp
 		}
 	case CompressionLZ4:
 		lz4Opts := []lz4.Option{
@@ -109,28 +167,35 @@ func newCompressorPool(cfg CompressConfig) (*sync.Pool, error) {
 		if err := first.Apply(lz4Opts...); err != nil {
 			return nil, fmt.Errorf("lz4 encoder: %w", err)
 		}
-		pool.Put(&lz4Compressor{w: first})
+		firstComp := &lz4Compressor{w: first}
+		pool.addCreated(firstComp)
+		pool.Put(firstComp)
 
-		pool.New = func() any {
+		pool.pool.New = func() any {
 			w := lz4.NewWriter(nil)
 			_ = w.Apply(lz4Opts...) //nolint:errcheck // options validated above
-
-			return &lz4Compressor{w: w}
+			comp := &lz4Compressor{w: w}
+			pool.addCreated(comp)
+			return comp
 		}
 	case CompressionDeflate:
 		first, err := iaa.InitIAAHandle()
 		if err != nil {
 			return nil, fmt.Errorf("deflate encoder: %w", err)
 		}
-		pool.Put(&deflateCompressor{h: first})
+		firstComp := &deflateCompressor{h: first}
+		pool.addCreated(firstComp)
+		pool.Put(firstComp)
 
-		pool.New = func() any {
+		pool.pool.New = func() any {
 			h, err := iaa.InitIAAHandle() //nolint:errcheck // options validated above
 			if err != nil {
 				fmt.Errorf("deflate encoder: %w", err)
 				return nil
 			}
-			return &deflateCompressor{h: h}
+			comp := &deflateCompressor{h: h}
+			pool.addCreated(comp)
+			return comp
 		}
 	default:
 		return nil, fmt.Errorf("unsupported compression type: %s", cfg.CompressionType())
