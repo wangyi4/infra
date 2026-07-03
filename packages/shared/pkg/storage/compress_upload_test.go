@@ -20,6 +20,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var gb *testing.B = nil
+
 // generateSemiRandomData produces deterministic, compressible data.
 // Random byte repeated 1-16 times — gives ~0.5-0.7 compression ratio.
 func generateSemiRandomData(size int) []byte {
@@ -377,7 +379,7 @@ func BenchmarkCompress(b *testing.B) {
 
 func BenchmarkStoreFile(b *testing.B) {
 	const dataSize = 1024 * megabyte // 1 GB
-
+	gb = b
 	data := generateSemiRandomData(dataSize)
 	inputDir := b.TempDir()
 	inputPath := filepath.Join(inputDir, "input.bin")
@@ -389,12 +391,14 @@ func BenchmarkStoreFile(b *testing.B) {
 		codec CompressionType
 		level int
 	}{
-		{"zstd1", CompressionZstd, 1},
-		{"zstd2", CompressionZstd, 2},
-		{"zstd3", CompressionZstd, 3},
-		{"lz4", CompressionLZ4, 0},
+		{"deflate", CompressionDeflate, 0},
+		//{"zstd1", CompressionZstd, 1},
+		//{"zstd2", CompressionZstd, 2},
+		//{"zstd3", CompressionZstd, 3},
+		//{"lz4", CompressionLZ4, 0},
 	}
-	workerCounts := []int{1, 2, 4, 8}
+	//workerCounts := []int{1, 2, 4, 8}
+	workerCounts := []int{2}
 
 	for _, codec := range codecs {
 		for _, workers := range workerCounts {
@@ -412,7 +416,7 @@ func BenchmarkStoreFile(b *testing.B) {
 
 				b.SetBytes(int64(dataSize))
 				b.ResetTimer()
-
+				//b.Logf("type: %d, name: %s\n", codec.codec, codec.codec.String())
 				for range b.N {
 					outDir := b.TempDir()
 					outPath := filepath.Join(outDir, "output.dat")
@@ -423,37 +427,38 @@ func BenchmarkStoreFile(b *testing.B) {
 						b.Fatal(err)
 					}
 					ft := fullFT.Table()
-
+					//b.Logf("compressedsize: %d, uncompressedsize: %d\n", ft.CompressedSize(), ft.UncompressedSize())
 					b.ReportMetric(float64(ft.CompressedSize())/float64(ft.UncompressedSize()), "ratio")
 				}
 			})
 		}
 	}
+	/*
+		b.Run("uncompressed", func(b *testing.B) {
+			b.SetBytes(int64(dataSize))
+			b.ResetTimer()
 
-	b.Run("uncompressed", func(b *testing.B) {
-		b.SetBytes(int64(dataSize))
-		b.ResetTimer()
+			for range b.N {
+				outDir := b.TempDir()
+				outPath := filepath.Join(outDir, "output.dat")
 
-		for range b.N {
-			outDir := b.TempDir()
-			outPath := filepath.Join(outDir, "output.dat")
-
-			in, err := os.Open(inputPath)
-			if err != nil {
-				b.Fatal(err)
-			}
-			out, err := os.Create(outPath)
-			if err != nil {
-				in.Close()
-				b.Fatal(err)
-			}
-			if _, err := io.Copy(out, in); err != nil {
+				in, err := os.Open(inputPath)
+				if err != nil {
+					b.Fatal(err)
+				}
+				out, err := os.Create(outPath)
+				if err != nil {
+					in.Close()
+					b.Fatal(err)
+				}
+				if _, err := io.Copy(out, in); err != nil {
+					in.Close()
+					out.Close()
+					b.Fatal(err)
+				}
 				in.Close()
 				out.Close()
-				b.Fatal(err)
 			}
-			in.Close()
-			out.Close()
-		}
-	})
+		})
+	*/
 }
