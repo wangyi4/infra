@@ -59,7 +59,7 @@ type deflateCompressor struct {
 }
 
 func (c *deflateCompressor) compress(src []byte) ([]byte, error) {
-	dst := make([]byte, len(src)) // Allocate a buffer twice the size of the input for worst-case scenario
+	dst := make([]byte, len(src))
 	out, err := c.h.Compress(src, dst)
 	if err != nil {
 		return nil, fmt.Errorf("deflate compress: %w", err)
@@ -73,7 +73,9 @@ func (c *deflateCompressor) close() error {
 		return nil
 	}
 
-	return c.h.Close()
+	c.h.Close()
+	c.h = nil
+	return nil
 }
 
 // lz4Compressor wraps a pooled lz4.Writer. The writer is reused via Reset

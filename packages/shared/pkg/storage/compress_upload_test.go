@@ -416,7 +416,6 @@ func BenchmarkStoreFile(b *testing.B) {
 
 				b.SetBytes(int64(dataSize))
 				b.ResetTimer()
-				//b.Logf("type: %d, name: %s\n", codec.codec, codec.codec.String())
 				for range b.N {
 					outDir := b.TempDir()
 					outPath := filepath.Join(outDir, "output.dat")

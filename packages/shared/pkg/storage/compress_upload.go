@@ -132,9 +132,7 @@ func compressStream(ctx context.Context, in io.Reader, cfg CompressConfig, uploa
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("create compressor pool: %w", err)
 	}
-	//defer func() {
-	//	_ = compressors.Close()
-	//}()
+	defer compressors.Close()
 
 	// Start the read loop.
 	q := make(chan *part, 2)
